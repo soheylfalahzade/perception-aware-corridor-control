@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "perception-aware-corridor-control"
+type: software
+version: 0.1.0
+license: MIT
+authors:
+  - alias: "soheylfalahzade"
+repository-code: "https://github.com/soheylfalahzade/perception-aware-corridor-control"
+keywords:
+  - traffic signal control
+  - fuzzy control
+  - geometric spanners
+  - perception reliability
+  - emergency vehicle preemption

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perception-aware-corridor-control"
+version = "0.1.0"
+description = "Does passing a perception-reliability signal to a fuzzy corridor controller help when the camera degrades? Backbone routes, fuzzy green splits and emergency-vehicle preemption in SUMO"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "soheylfalahzade" }]
+keywords = ["intelligent-transportation-systems", "fuzzy-control", "traffic-signal-control", "geometric-spanners", "perception", "sumo"]
+dependencies = ["numpy>=1.24", "pandas>=2.0", "matplotlib>=3.7"]
+
+[project.optional-dependencies]
+sumo = ["eclipse-sumo", "traci", "sumolib"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8"]
+
+[project.scripts]
+pacc-eval = "pacc.evaluate:main"
+pacc-figures = "pacc.figures:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pacc = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
