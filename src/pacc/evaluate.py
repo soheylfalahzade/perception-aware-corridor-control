@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pacc.graph import backbone_report, edge_ids, greedy_spanner, load_grid, route
+from pacc.graph import edge_ids, greedy_spanner, load_grid, route, route_comparison
 from pacc.sim import Job, make_routes, run_one
 
 SCENARIOS = (("fixed", False), ("oracle", False), ("naive", False), ("aware", False),
@@ -62,16 +62,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--origin", default="A0")
     ap.add_argument("--dest", default="E4")
     ap.add_argument("--stretch", type=float, default=3.0, help="spanner stretch t")
+    ap.add_argument("--route-mode", choices=("backbone", "shortest"), default="backbone",
+                    help="route of the emergency vehicle and the corridor flow")
     ap.add_argument("--corridor-vph", type=float, default=700.0,
                     help="demand along the corridor route (vehicles per hour)")
     ap.add_argument("--out", default="results/eval")
     args = ap.parse_args(argv)
     weights, directed = load_grid(args.net)
     keep = greedy_spanner(weights, args.stretch)
-    _, path = route({e: weights[e] for e in keep}, args.origin, args.dest)
+    report = route_comparison(weights, args.origin, args.dest, args.stretch)
+    if args.route_mode == "backbone":
+        _, path = route({e: weights[e] for e in keep}, args.origin, args.dest)
+    else:
+        _, path = route(weights, args.origin, args.dest)
     ev_edges = tuple(edge_ids(path, directed))
     controlled = tuple(path[1:-1])
-    report = backbone_report(weights, args.origin, args.dest, args.stretch)
     with tempfile.TemporaryDirectory() as tmp:
         seeds = range(args.seed0, args.seed0 + args.seeds)
         routes = {s: make_routes(args.net, s, Path(tmp) / f"s{s}.rou.xml", ev_edges,
@@ -86,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     df.to_csv(out / "runs.csv", index=False)
     summary = summarise(df)
     summary["backbone"] = report
+    summary["route_mode"] = args.route_mode
     summary["route_junctions"] = list(path)
     (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps(summary, indent=2))

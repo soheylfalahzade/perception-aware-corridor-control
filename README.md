@@ -72,6 +72,22 @@ Reliability-aware against naive, same seeds (negative: aware is better):
 - **With a healthy camera the reliability weighting costs little**: the differences against naive are positive but their intervals include zero (+4.9 [-2.9, 12.3] s and +2.9 [-3.1, 9.6] s).
 - **The emergency vehicle is slower with adaptive control at 700 veh/h** than under fixed-time operation (+13.6 to +27.5 s, all intervals above zero), although it is preempted in every condition. The cause was not isolated here; at 900 veh/h the sign reverses and the intervals include zero except for the oracle and naive-clear conditions. Other vehicles' delay is within about 3 s of fixed-time in all conditions.
 
+## Route on a backbone with larger stretch (B0 to E4, t = 7)
+
+With the origin A0 and destination E4 the backbone route equals the shortest route for every t from 3 to 50 on this grid (stretch 1.0), so the backbone cannot change the route there. For B0 to E4 and t = 7 the greedy spanner keeps 26 of 40 segments and the backbone route is 28.4 % longer in free-flow time than the shortest route (9 against 7 segments; the backbone route goes B0, B1, A1, A2, A3, B3, B4, C4, D4, E4, the shortest route B0, B1, B2, B3, B4, C4, D4, E4). The same study (12 seeds, paired, true counts, healthy and degraded camera) was run with the emergency vehicle and the corridor flow on each route (`pacc-eval --origin B0 --dest E4 --stretch 7 --route-mode backbone|shortest`).
+
+| route | demand | fixed-time EV time (s) | oracle EV change (s) | aware minus naive, degraded: EV time (s) | aware minus naive, degraded: corridor delay (s) |
+|---|---|---|---|---|---|
+| backbone | 700 veh/h | 161.2 | +31.4 [+11.8, +51.7] | +15.9 [-13.8, 45.3] | -13.7 [-25.4, -2.5] |
+| shortest | 700 veh/h | 119.4 | -5.3 [-9.2, -0.6] | -22.9 [-35.3, -10.1] | -28.0 [-34.6, -21.9] |
+| backbone | 900 veh/h | 171.3 | +41.2 [+17.6, +66.4] | +0.3 [-31.3, 33.3] | -0.1 [-6.1, 6.0] |
+| shortest | 900 veh/h | 135.9 | -12.3 [-17.0, -6.8] | -32.2 [-38.8, -24.7] | -17.3 [-22.7, -11.8] |
+
+- **The backbone route costs the emergency vehicle far more than its free-flow stretch**: under fixed-time control it needs 161.2 s at 700 veh/h against 119.4 s on the shortest route (+35 %), and 171.3 s against 135.9 s at 900 veh/h (+26 %). Both are single-OD observations; the delay per junction was not analysed.
+- **On the shortest route adaptive control speeds up the emergency vehicle with a healthy camera** (oracle: -5.3 and -12.3 s, intervals below zero), whereas on the backbone route it slows it down (+31.4 and +41.2 s, intervals above zero). The slow-down seen for A0 to E4 at 700 veh/h is therefore not a general property of the adaptive controller; its cause is still not isolated.
+- **With a degraded camera the reliability score helps on the shortest route** (aware minus naive: EV time -22.9 and -32.2 s, corridor delay -28.0 and -17.3 s, intervals below zero); on the backbone route the EV intervals include zero and only the corridor delay at 700 veh/h is below zero.
+- The corridor flow follows the route in each mode, so route and corridor load are changed together; fixed-time corridor delays differ between modes (191.3 against 85.1 s at 700 veh/h).
+
 ## Claims and evidence
 
 | claim | evidence | file |
@@ -82,12 +98,15 @@ Reliability-aware against naive, same seeds (negative: aware is better):
 | the reliability score helps at saturation | **partially supported**: corridor delay -7.7 [-16.9, 1.6] s (interval includes zero), EV time -37.2 [-69.0, -4.8] s | `docs/results/summary_900.json` |
 | the reliability weighting is free in clear conditions | **partially supported**: +4.9 and +2.9 s on corridor delay, intervals include zero | `docs/results/summary_*.json` |
 | adaptive control speeds up the emergency vehicle | **not supported** at 700 veh/h (slower by 13.6 to 27.5 s, intervals above zero); at 900 veh/h faster with true counts or a clear camera (-58.6 [-109.8, -13.9] s), intervals include zero for the other conditions | `docs/results/summary_*.json` |
+| a spanner backbone route is a free choice of controlled junctions | **not supported** for B0 to E4, t = 7: the backbone route is 28.4 % longer and the emergency vehicle is 26 to 35 % slower under fixed-time control; for A0 to E4 the backbone route equals the shortest route for t from 3 to 50 | `docs/results/stretch7_*.json` |
+| the reliability score helps the emergency vehicle on the shortest route when the camera is degraded | **supported** (single OD, 12 seeds): -22.9 [-35.3, -10.1] s at 700 veh/h, -32.2 [-38.8, -24.7] s at 900 veh/h | `docs/results/stretch7_shortest_*.json` |
+| adaptive control slows the emergency vehicle in general | **not supported**: on the shortest route B0 to E4 it is faster with a healthy camera (-5.3 [-9.2, -0.6] s at 700 veh/h); slower on the backbone route (+31.4 [+11.8, +51.7] s) | `docs/results/stretch7_*.json` |
 
 ## Threats to validity
 
 - *Construct:* perception is emulated at the interface of counts and a reliability score; the miss model (binomial thinning), the severity and the lag are assumptions, not measurements of a detector. The lag is chosen in line with alarm latencies reported by `perception-reliability-monitor`.
 - *Internal:* the rule base, the prior update and the trust threshold (r >= 0.8) were set a priori and not tuned; the corridor flow and the degradation window are fixed scenario choices. The emergency-vehicle result at 700 veh/h is unexplained.
-- *External:* one 5 x 5 grid, one route, one degradation episode and one emergency-vehicle trip per run; the backbone route coincides with the shortest route (stretch 1.0), so the backbone does not change the route here.
+- *External:* one 5 x 5 grid, one route, one degradation episode and one emergency-vehicle trip per run; for A0 to E4 the backbone route coincides with the shortest route (stretch 1.0); the larger-stretch comparison uses one other origin-destination pair (B0 to E4).
 - *Statistical:* 12 seeds; intervals are bootstrap intervals of the mean paired difference and are not corrected for the number of comparisons.
 
 ## Data and code availability
@@ -102,7 +121,7 @@ All code, the network, seeds, per-run tables and summaries are in this repositor
 
 ## Roadmap
 
-Reliability scores from a real monitor and counts from a real detector instead of the emulation; routes on backbones with a larger stretch; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
+Reliability scores from a real monitor and counts from a real detector instead of the emulation; per-junction delay analysis on the backbone route; several origin-destination pairs; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
 
 ## Citation
 

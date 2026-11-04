@@ -4,7 +4,7 @@ import pytest
 
 from pacc.evaluate import paired_ci, summarise
 from pacc.fuzzy import G_MAX, G_MIN, green_duration
-from pacc.graph import adjacency, backbone_report, dijkstra, greedy_spanner, route
+from pacc.graph import adjacency, backbone_report, dijkstra, greedy_spanner, route, route_comparison
 from pacc.perception import EPISODE, Camera, severity
 
 
@@ -78,3 +78,10 @@ def test_summarise_pairs_each_scenario_with_fixed_time():
     oracle = out["scenarios"]["oracle_clear"]["corridor_loss_s"]
     assert oracle["delta_vs_fixed"] == pytest.approx(-40)
     assert out["aware_minus_naive_degraded"]["corridor_loss_s"]["mean"] == pytest.approx(-10)
+
+
+def test_route_comparison_reports_both_routes():
+    rep = route_comparison(_grid(4), "0_0", "3_3", 3.0)
+    assert rep["route_stretch"] >= 1.0
+    assert rep["backbone_time_s"] >= rep["full_time_s"]
+    assert rep["full_path"][0] == rep["backbone_path"][0] == "0_0"

@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. The format follows Keep a Changelog and
 the project uses semantic versioning.
 
+## [Unreleased]
+
+- `route_comparison` in `pacc.graph` (backbone against shortest route: times, stretch, junction sets).
+- `--route-mode backbone|shortest` in `pacc-eval`; larger-stretch results in `docs/results/stretch7_*`.
+
 ## [0.1.0]
 
 - Junction graph, greedy t-spanner backbone and backbone routes (`pacc.graph`).

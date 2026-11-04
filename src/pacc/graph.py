@@ -88,3 +88,20 @@ def backbone_report(weights: dict[Edge, float], src: str, dst: str, t: float) ->
     sub, path = route({e: weights[e] for e in keep}, src, dst)
     return {"edges_full": float(len(weights)), "edges_backbone": float(len(keep)),
             "route_stretch": sub / full, "route_junctions": float(len(path))}
+
+
+def route_comparison(weights: dict[Edge, float], src: str, dst: str, t: float) -> dict[str, object]:
+    """Backbone route against the shortest route of the whole graph.
+
+    Reports both free-flow times, the stretch and the junctions that only one route controls.
+    """
+    keep = greedy_spanner(weights, t)
+    full, full_path = route(weights, src, dst)
+    sub, sub_path = route({e: weights[e] for e in keep}, src, dst)
+    inner_full, inner_sub = set(full_path[1:-1]), set(sub_path[1:-1])
+    return {"t": t, "edges_backbone": len(keep), "edges_full": len(weights),
+            "full_time_s": full, "backbone_time_s": sub, "route_stretch": sub / full,
+            "full_path": full_path, "backbone_path": sub_path,
+            "junctions_full": len(inner_full), "junctions_backbone": len(inner_sub),
+            "only_full": sorted(inner_full - inner_sub),
+            "only_backbone": sorted(inner_sub - inner_full)}
