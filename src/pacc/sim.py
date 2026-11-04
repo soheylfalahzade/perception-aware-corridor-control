@@ -75,6 +75,7 @@ class Job:
     degraded: bool
     ev_edges: tuple[str, ...]
     controlled: tuple[str, ...]
+    trace: bool = False
 
 
 def _preempt(conn: Any, tl: str, road: str, lane_edge: list[str]) -> None:
@@ -82,7 +83,7 @@ def _preempt(conn: Any, tl: str, road: str, lane_edge: list[str]) -> None:
     conn.trafficlight.setRedYellowGreenState(tl, state)
 
 
-def run_one(job: Job) -> dict[str, float | int | str | bool]:
+def run_one(job: Job) -> dict[str, Any]:
     """Simulate one job and return the emergency-vehicle time and the mean time loss."""
     import traci
 
@@ -104,6 +105,7 @@ def run_one(job: Job) -> dict[str, float | int | str | bool]:
     pre_since: dict[str, float] = {}
     prior: dict[tuple[str, int], float] = {}
     inserted = False
+    stats: dict[str, list[float]] = {}
     try:
         while conn.simulation.getMinExpectedNumber() > 0 and conn.simulation.getTime() < MAX_T:
             conn.simulationStep()
@@ -117,6 +119,15 @@ def run_one(job: Job) -> dict[str, float | int | str | bool]:
                     pass
                 inserted = True
             ev_road = conn.vehicle.getRoadID("ev") if "ev" in conn.vehicle.getIDList() else None
+            if job.trace and ev_road is not None and not ev_road.startswith(":"):
+                lane = conn.vehicle.getLaneID("ev")
+                pos = conn.vehicle.getLanePosition("ev")
+                ahead = sum(1 for v in conn.lane.getLastStepVehicleIDs(lane)
+                            if v != "ev" and conn.vehicle.getLanePosition(v) > pos)
+                st = stats.setdefault(ev_road, [t, 0.0, 0.0, 0.0])   # entry, time, stopped, ahead
+                st[1] += 1.0
+                st[2] += float(conn.vehicle.getSpeed("ev") < 0.1)
+                st[3] += ahead
             for tl in tls:
                 lanes = lane_of[tl]
                 edges = [ln.rsplit("_", 1)[0] for ln in lanes]
@@ -167,7 +178,11 @@ def run_one(job: Job) -> dict[str, float | int | str | bool]:
         else:
             oth.append(loss)
     nan = float("nan")
-    return {"seed": job.seed, "controller": job.controller, "degraded": job.degraded,
+    trace = [{"seed": job.seed, "controller": job.controller, "degraded": job.degraded,
+              "edge": e, "entry_s": v[0], "time_s": v[1], "stopped_s": v[2],
+              "mean_ahead": v[3] / v[1]} for e, v in stats.items()]
+    return {"trace": trace, "seed": job.seed, "controller": job.controller,
+            "degraded": job.degraded,
             "ev_time_s": ev_time, "corridor_loss_s": float(np.mean(cor)) if cor else nan,
             "other_loss_s": float(np.mean(oth)) if oth else nan, "n_corridor": len(cor),
             "n_other": len(oth), "unfinished": int(unfinished)}

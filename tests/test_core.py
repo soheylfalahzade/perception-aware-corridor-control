@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pacc.evaluate import paired_ci, summarise
+from pacc.evaluate import paired_ci, summarise, summarise_trace
 from pacc.fuzzy import G_MAX, G_MIN, green_duration
 from pacc.graph import adjacency, backbone_report, dijkstra, greedy_spanner, route, route_comparison
 from pacc.perception import EPISODE, Camera, severity
@@ -85,3 +85,13 @@ def test_route_comparison_reports_both_routes():
     assert rep["route_stretch"] >= 1.0
     assert rep["backbone_time_s"] >= rep["full_time_s"]
     assert rep["full_path"][0] == rep["backbone_path"][0] == "0_0"
+
+
+def test_summarise_trace_orders_edges_by_entry_time():
+    import pandas as pd
+    tr = pd.DataFrame({"seed": [0, 0, 1, 1], "controller": ["fixed"] * 4, "degraded": [False] * 4,
+                       "edge": ["b", "a", "b", "a"], "entry_s": [20.0, 10.0, 22.0, 12.0],
+                       "time_s": [5.0, 4.0, 7.0, 6.0], "stopped_s": [0.0] * 4,
+                       "mean_ahead": [1.0, 0.0, 3.0, 2.0]})
+    out = summarise_trace(tr)
+    assert list(out.edge) == ["a", "b"] and out.time_s.tolist() == [5.0, 6.0]

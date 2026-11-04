@@ -51,6 +51,19 @@ def summarise(df: pd.DataFrame) -> dict:
     return out
 
 
+def summarise_trace(tr: pd.DataFrame) -> pd.DataFrame:
+    """Mean time, stopped time and vehicles ahead per edge of the emergency vehicle's route,
+    for each controller and perception condition, in route order."""
+    key = tr.controller + np.where(tr.degraded, "_degraded", "_clear")
+    g = tr.assign(key=key).groupby(["edge", "key"]).agg(
+        entry_s=("entry_s", "mean"), time_s=("time_s", "mean"),
+        stopped_s=("stopped_s", "mean"), mean_ahead=("mean_ahead", "mean"),
+        n=("seed", "nunique")).reset_index()
+    order = g.groupby("edge").entry_s.mean().sort_values().index
+    g["edge"] = pd.Categorical(g.edge, categories=order, ordered=True)
+    return g.sort_values(["edge", "key"]).drop(columns="entry_s").reset_index(drop=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point (``pacc-eval``)."""
     ap = argparse.ArgumentParser(description=__doc__)
@@ -64,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--stretch", type=float, default=3.0, help="spanner stretch t")
     ap.add_argument("--route-mode", choices=("backbone", "shortest"), default="backbone",
                     help="route of the emergency vehicle and the corridor flow")
+    ap.add_argument("--trace", action="store_true",
+                    help="also write the time, stopped time and queue ahead per edge of the EV")
     ap.add_argument("--corridor-vph", type=float, default=700.0,
                     help="demand along the corridor route (vehicles per hour)")
     ap.add_argument("--out", default="results/eval")
@@ -81,13 +96,17 @@ def main(argv: list[str] | None = None) -> int:
         seeds = range(args.seed0, args.seed0 + args.seeds)
         routes = {s: make_routes(args.net, s, Path(tmp) / f"s{s}.rou.xml", ev_edges,
                                 corridor_vph=args.corridor_vph) for s in seeds}
-        jobs = [Job(args.net, routes[s], args.add, s, c, d, ev_edges, controlled)
+        jobs = [Job(args.net, routes[s], args.add, s, c, d, ev_edges, controlled, args.trace)
                 for s in seeds for c, d in SCENARIOS]
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
             rows = list(pool.map(run_one, jobs))
-    df = pd.DataFrame(rows)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    if args.trace:
+        tr = pd.DataFrame([r for row in rows for r in row["trace"]])
+        tr.to_csv(out / "edge_trace.csv", index=False)
+        summarise_trace(tr).to_csv(out / "edge_summary.csv", index=False)
+    df = pd.DataFrame([{k: v for k, v in row.items() if k != "trace"} for row in rows])
     df.to_csv(out / "runs.csv", index=False)
     summary = summarise(df)
     summary["backbone"] = report

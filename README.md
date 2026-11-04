@@ -88,6 +88,22 @@ With the origin A0 and destination E4 the backbone route equals the shortest rou
 - **With a degraded camera the reliability score helps on the shortest route** (aware minus naive: EV time -22.9 and -32.2 s, corridor delay -28.0 and -17.3 s, intervals below zero); on the backbone route the EV intervals include zero and only the corridor delay at 700 veh/h is below zero.
 - The corridor flow follows the route in each mode, so route and corridor load are changed together; fixed-time corridor delays differ between modes (191.3 against 85.1 s at 700 veh/h).
 
+### Where the emergency vehicle loses time (700 veh/h, B0 to E4, healthy camera)
+
+`pacc-eval --trace` records, for every simulation step in which the emergency vehicle is on a street segment, the time spent there, the time it stood still and the number of vehicles ahead of it in its lane (`docs/results/edge_summary_*_700.csv`, per-seed rows in `edge_trace_*_700.csv`). Time on the segments only (junction interiors excluded), means over 12 seeds:
+
+| route | segment | fixed-time (s) | oracle (s) | change [95% interval] (s) | vehicles ahead, fixed / oracle |
+|---|---|---|---|---|---|
+| backbone | B0B1 | 12.6 | 19.5 | +6.9 [+4.1, +9.3] | 0.1 / 2.3 |
+| backbone | A1A2 | 13.2 | 37.8 | +24.6 [+20.2, +29.4] | 1.4 / 4.7 |
+| backbone | A3B3 | 32.9 | 25.6 | -7.3 [-24.3, +6.9] | 4.2 / 2.0 |
+| shortest | B3B4 | 25.2 | 14.0 | -11.2 [-12.6, -9.8] | 4.5 / 2.3 |
+| shortest | B4C4 | 23.2 | 18.4 | -4.8 [-6.7, -2.8] | 5.0 / 3.7 |
+
+- Under fixed-time control the backbone route spends 144.8 s on its segments against 108.8 s on the shortest route; most of the difference is on the three segments A1A2, A2A3 and A3B3 (68.2 s against the 22.2 s the shortest route needs for the two segments B1B2 and B2B3).
+- With adaptive control the extra time on the backbone route comes mostly from one segment, A1A2 (+24.6 s), where the number of vehicles ahead of the emergency vehicle rises from 1.4 to 4.7 and it stands still for 3.3 s on average. On the shortest route the adaptive controller shortens the time on the two segments that hold the longest queues under fixed-time control.
+- This is descriptive: queues ahead of the emergency vehicle go together with its delay, but the study does not intervene on them, so it does not show that the queue is the cause. A preempted green does not clear vehicles that stand in the emergency vehicle's lane.
+
 ## Claims and evidence
 
 | claim | evidence | file |
@@ -101,6 +117,7 @@ With the origin A0 and destination E4 the backbone route equals the shortest rou
 | a spanner backbone route is a free choice of controlled junctions | **not supported** for B0 to E4, t = 7: the backbone route is 28.4 % longer and the emergency vehicle is 26 to 35 % slower under fixed-time control; for A0 to E4 the backbone route equals the shortest route for t from 3 to 50 | `docs/results/stretch7_*.json` |
 | the reliability score helps the emergency vehicle on the shortest route when the camera is degraded | **supported** (single OD, 12 seeds): -22.9 [-35.3, -10.1] s at 700 veh/h, -32.2 [-38.8, -24.7] s at 900 veh/h | `docs/results/stretch7_shortest_*.json` |
 | adaptive control slows the emergency vehicle in general | **not supported**: on the shortest route B0 to E4 it is faster with a healthy camera (-5.3 [-9.2, -0.6] s at 700 veh/h); slower on the backbone route (+31.4 [+11.8, +51.7] s) | `docs/results/stretch7_*.json` |
+| the emergency-vehicle slow-down on the backbone route comes from queues ahead of it | **partially supported** (descriptive): A1A2 +24.6 [+20.2, +29.4] s with 1.4 to 4.7 vehicles ahead; no intervention on the queue | `docs/results/edge_summary_*_700.csv` |
 
 ## Threats to validity
 
@@ -121,7 +138,7 @@ All code, the network, seeds, per-run tables and summaries are in this repositor
 
 ## Roadmap
 
-Reliability scores from a real monitor and counts from a real detector instead of the emulation; per-junction delay analysis on the backbone route; several origin-destination pairs; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
+Reliability scores from a real monitor and counts from a real detector instead of the emulation; an intervention on the queue ahead of the emergency vehicle (for example a lane-clearing rule); several origin-destination pairs; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
 
 ## Citation
 
