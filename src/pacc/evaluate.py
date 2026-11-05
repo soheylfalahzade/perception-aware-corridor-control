@@ -79,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="route of the emergency vehicle and the corridor flow")
     ap.add_argument("--preempt-m", type=float, default=PREEMPT_M,
                     help="distance before the stop line at which the signal turns green for the EV")
+    ap.add_argument("--replay", default="",
+                    help="perception table of real footage (scripts/build_replay.py); "
+                         "empty keeps the emulated camera")
+    ap.add_argument("--replay-cond", default="night", help="degradation replayed in the episode")
     ap.add_argument("--trace", action="store_true",
                     help="also write the time, stopped time and queue ahead per edge of the EV")
     ap.add_argument("--corridor-vph", type=float, default=700.0,
@@ -99,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         routes = {s: make_routes(args.net, s, Path(tmp) / f"s{s}.rou.xml", ev_edges,
                                 corridor_vph=args.corridor_vph) for s in seeds}
         jobs = [Job(args.net, routes[s], args.add, s, c, d, ev_edges, controlled, args.trace,
-                    args.preempt_m)
+                    args.preempt_m, args.replay, args.replay_cond)
                 for s in seeds for c, d in SCENARIOS]
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
             rows = list(pool.map(run_one, jobs))
@@ -114,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarise(df)
     summary["backbone"] = report
     summary["route_mode"] = args.route_mode
+    summary["perception"] = ({"replay": args.replay, "cond": args.replay_cond} if args.replay
+                             else "emulated")
     summary["route_junctions"] = list(path)
     (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps(summary, indent=2))

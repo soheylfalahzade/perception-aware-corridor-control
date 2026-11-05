@@ -21,6 +21,7 @@ import numpy as np
 
 from pacc.fuzzy import green_duration
 from pacc.perception import Camera
+from pacc.replay import ReplayCamera
 
 END_DEMAND, MAX_T, T_EV, PREEMPT_M = 900.0, 1800.0, 450.0, 80.0
 CONTROLLERS = ("fixed", "oracle", "naive", "aware")
@@ -77,6 +78,8 @@ class Job:
     controlled: tuple[str, ...]
     trace: bool = False
     preempt_m: float = PREEMPT_M
+    replay: str = ""
+    replay_cond: str = "night"
 
 
 def _preempt(conn: Any, tl: str, road: str, lane_edge: list[str]) -> None:
@@ -96,7 +99,9 @@ def run_one(job: Job) -> dict[str, Any]:
                  "--duration-log.disable", "true", "--tripinfo-output", str(tripinfo)],
                 label=label)
     conn = traci.getConnection(label)
-    cam = Camera(np.random.default_rng(job.seed))
+    rng = np.random.default_rng(job.seed)
+    cam: Camera | ReplayCamera = (ReplayCamera(rng, job.replay, job.replay_cond) if job.replay
+                                  else Camera(rng))
     tls = [t for t in job.controlled if t in conn.trafficlight.getIDList()]
     lane_of: dict[str, list[str]] = {}
     for tl in tls:

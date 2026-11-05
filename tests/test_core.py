@@ -95,3 +95,25 @@ def test_summarise_trace_orders_edges_by_entry_time():
                        "mean_ahead": [1.0, 0.0, 3.0, 2.0]})
     out = summarise_trace(tr)
     assert list(out.edge) == ["a", "b"] and out.time_s.tolist() == [5.0, 6.0]
+
+
+def test_replay_camera_uses_degraded_frames_in_episode(tmp_path):
+    import numpy as np
+    import pandas as pd
+
+    from pacc.replay import ReplayCamera
+    rows = []
+    for cond, p, n_det in (("clear", 0.9, 10), ("night", 0.1, 2)):
+        for f in range(5):
+            sev = 0.0 if cond == "clear" else 1.0
+            rows.append({"video": "v", "seg": 0, "cond": cond, "sev": sev, "frame": f,
+                         "n_gt": 10, "n_det": n_det, "label": 1.0, "p": p})
+    path = tmp_path / "t.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    cam = ReplayCamera(np.random.default_rng(0), str(path), "night")
+    for t in range(1, 60):
+        cam.step(float(t), True)
+    assert cam.r > 0.8 and cam.count(10, 59.0, True) == 10.0
+    for t in range(300, 400):
+        cam.step(float(t), True)
+    assert cam.r < 0.2 and cam.count(10, 399.0, True) < 10.0

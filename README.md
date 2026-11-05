@@ -122,6 +122,20 @@ The signal turns green for the emergency vehicle once it is within `--preempt-m`
 - On the shortest route earlier preemption shortens the emergency vehicle's time under every controller, most strongly with a degraded camera and the naive counts (-31.6 s).
 - The cause of the delay on A1A2 is still not isolated; the queue-ahead association from the previous table stands as descriptive only.
 
+## Perception replayed from real footage
+
+The emulated camera (a fixed miss rate and a lagged score) can be replaced by frames of real traffic video: `scripts/build_replay.py` turns the per-frame results of the real-footage validation (12 clips of the UA-DETRAC data set with human-labelled boxes, YOLOv8-nano detector, ten monitor features per frame) into `docs/data/perception_replay.csv` with, per frame, the human count, the detector count and the reliability score of the monitor. The score is out-of-sample (the monitor is fitted on the other 11 clips). `pacc-eval --replay docs/data/perception_replay.csv --replay-cond night|rain` then replays, per seed, one clip: undegraded frames outside the episode and frames of the chosen degradation inside it, one frame per simulated second. The detector's count ratio of the frame scales the true queue count and the monitor score is smoothed as before (`src/pacc/replay.py`). Route B0 to E4 (shortest), 700 veh/h, 12 seeds, paired:
+
+| replayed degradation (severity 1) | detector count ratio in the footage | aware minus naive, degraded: EV time (s) | aware minus naive, degraded: corridor delay (s) |
+|---|---|---|---|
+| night | 0.00 | -30.3 [-37.3, -23.3] | -18.6 [-24.6, -13.6] |
+| rain | 0.64 | +7.4 [-2.4, +18.5] | -5.0 [-11.5, +2.2] |
+
+- When the detector loses almost everything (night at severity 1: the detector count is about zero) the reliability score helps the emergency vehicle and the corridor flow; when it loses part of the vehicles (rain at severity 1: 64 % of the human count) the study cannot resolve a benefit (intervals contain zero). This is in line with the real-footage result that the monitor's advantage over the count ratio alone is small when the detector degrades partially.
+- Naive control under the replayed night degradation is clearly worse than fixed-time control (EV time +27.9 [+19.6, +35.8] s, corridor delay +19.6 [+13.8, +25.4] s); aware control is not distinguishable from fixed-time control (EV time -2.3 [-10.5, +7.2] s, corridor delay +1.0 [-2.5, +4.6] s).
+- With the undegraded replayed footage the detector's counts are imperfect (it adds and misses vehicles), so naive control is no longer identical to the oracle, and aware minus naive is -6.3 [-12.8, -0.8] s for the emergency vehicle.
+- The footage degradations are applied to the images, not to the traffic; only the native weather of each clip is real. The replayed frames are not those of the simulated traffic, only the detector's behaviour and the monitor's score are carried over.
+
 ## Claims and evidence
 
 | claim | evidence | file |
@@ -138,6 +152,7 @@ The signal turns green for the emergency vehicle once it is within `--preempt-m`
 | the emergency-vehicle slow-down on the backbone route comes from queues ahead of it | **partially supported** (descriptive): A1A2 +24.6 [+20.2, +29.4] s with 1.4 to 4.7 vehicles ahead; no intervention on the queue | `docs/results/edge_summary_*_700.csv` |
 | earlier preemption (150 m instead of 80 m) removes the backbone-route delay | **not supported**: segment A1A2 -0.3 [-4.8, +4.2] s; oracle minus fixed-time still +36.8 [+26.9, +48.0] s | `docs/results/preempt150_*_700_runs.csv` |
 | earlier preemption helps the emergency vehicle on the shortest route | **supported** (single OD, 12 seeds): oracle -8.2 [-12.8, -4.1] s, fixed-time -4.6 [-7.9, -1.5] s | `docs/results/preempt150_*_700_runs.csv` |
+| the reliability score helps when the camera follows the behaviour measured on real footage | **partially supported**: night replay (detector count about zero), aware minus naive EV time -30.3 [-37.3, -23.3] s and corridor delay -18.6 [-24.6, -13.6] s; rain replay +7.4 [-2.4, +18.5] s and -5.0 [-11.5, +2.2] s (not resolved) | `docs/results/replay_*_700.json` |
 
 ## Threats to validity
 
@@ -148,11 +163,11 @@ The signal turns green for the emergency vehicle once it is within `--preempt-m`
 
 ## Data and code availability
 
-All code, the network, seeds, per-run tables and summaries are in this repository (`docs/results/`). No external data are used. Commands and versions: [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
+All code, the network, seeds, per-run tables and summaries are in this repository (`docs/results/`). The replay table (`docs/data/perception_replay.csv`) holds only per-frame counts and scores derived from the UA-DETRAC data set; no images or boxes are included. Commands and versions: [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
 
 ## Limitations and scope
 
-- Emulated perception only; no detector, no image data.
+- Perception is emulated by default; the replay option carries over detector counts and monitor scores of real footage, but the frames are not those of the simulated traffic and the degradations were applied to the images.
 - The backbone enters through the choice of the controlled route; a route that differs from the shortest one, and several corridors at once, are not studied.
 - Fuzzy rules use queue counts at the start of a green; no coordination between junctions and no learning.
 
