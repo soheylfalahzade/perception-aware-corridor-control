@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from pacc.graph import edge_ids, greedy_spanner, load_grid, route, route_comparison
-from pacc.sim import Job, make_routes, run_one
+from pacc.sim import PREEMPT_M, Job, make_routes, run_one
 
 SCENARIOS = (("fixed", False), ("oracle", False), ("naive", False), ("aware", False),
              ("naive", True), ("aware", True))
@@ -77,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--stretch", type=float, default=3.0, help="spanner stretch t")
     ap.add_argument("--route-mode", choices=("backbone", "shortest"), default="backbone",
                     help="route of the emergency vehicle and the corridor flow")
+    ap.add_argument("--preempt-m", type=float, default=PREEMPT_M,
+                    help="distance before the stop line at which the signal turns green for the EV")
     ap.add_argument("--trace", action="store_true",
                     help="also write the time, stopped time and queue ahead per edge of the EV")
     ap.add_argument("--corridor-vph", type=float, default=700.0,
@@ -96,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
         seeds = range(args.seed0, args.seed0 + args.seeds)
         routes = {s: make_routes(args.net, s, Path(tmp) / f"s{s}.rou.xml", ev_edges,
                                 corridor_vph=args.corridor_vph) for s in seeds}
-        jobs = [Job(args.net, routes[s], args.add, s, c, d, ev_edges, controlled, args.trace)
+        jobs = [Job(args.net, routes[s], args.add, s, c, d, ev_edges, controlled, args.trace,
+                    args.preempt_m)
                 for s in seeds for c, d in SCENARIOS]
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
             rows = list(pool.map(run_one, jobs))

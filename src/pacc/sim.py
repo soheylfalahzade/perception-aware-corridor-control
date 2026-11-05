@@ -76,6 +76,7 @@ class Job:
     ev_edges: tuple[str, ...]
     controlled: tuple[str, ...]
     trace: bool = False
+    preempt_m: float = PREEMPT_M
 
 
 def _preempt(conn: Any, tl: str, road: str, lane_edge: list[str]) -> None:
@@ -140,7 +141,7 @@ def run_one(job: Job) -> dict[str, Any]:
                     continue
                 if ev_road in edges and ev_road is not None:
                     length = conn.lane.getLength(ev_road + "_0")
-                    if conn.vehicle.getLanePosition("ev") >= length - PREEMPT_M:
+                    if conn.vehicle.getLanePosition("ev") >= length - job.preempt_m:
                         _preempt(conn, tl, ev_road, edges)
                         pre_since[tl] = t
                         continue

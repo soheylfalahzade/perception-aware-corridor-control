@@ -104,6 +104,24 @@ With the origin A0 and destination E4 the backbone route equals the shortest rou
 - With adaptive control the extra time on the backbone route comes mostly from one segment, A1A2 (+24.6 s), where the number of vehicles ahead of the emergency vehicle rises from 1.4 to 4.7 and it stands still for 3.3 s on average. On the shortest route the adaptive controller shortens the time on the two segments that hold the longest queues under fixed-time control.
 - This is descriptive: queues ahead of the emergency vehicle go together with its delay, but the study does not intervene on them, so it does not show that the queue is the cause. A preempted green does not clear vehicles that stand in the emergency vehicle's lane.
 
+### Does earlier preemption remove the delay on the backbone route? (700 veh/h, B0 to E4)
+
+The signal turns green for the emergency vehicle once it is within `--preempt-m` of the stop line (default 80 m; segments are 150 m, so 150 m means as soon as it enters the segment). The same study (12 seeds, paired, healthy camera unless noted) was repeated with 150 m (`docs/results/preempt150_*_700_runs.csv`, `edge_*_700_p150.csv`).
+
+| route | quantity | 80 m | 150 m | change [95% interval] (s) |
+|---|---|---|---|---|
+| backbone | segment A1A2, oracle (s) | 37.8 | 37.4 | -0.3 [-4.8, +4.2] |
+| backbone | emergency-vehicle time, oracle (s) | 192.7 | 186.2 | -6.5 [-20.7, +8.3] |
+| backbone | emergency-vehicle time, fixed-time (s) | 161.2 | 149.4 | -11.8 [-27.8, +0.2] |
+| shortest | emergency-vehicle time, oracle (s) | 114.1 | 105.9 | -8.2 [-12.8, -4.1] |
+| shortest | emergency-vehicle time, fixed-time (s) | 119.4 | 114.8 | -4.6 [-7.9, -1.5] |
+| shortest | emergency-vehicle time, degraded camera, naive (s) | 147.8 | 116.2 | -31.6 [-40.6, -22.7] |
+
+- Earlier preemption does **not** remove the extra delay on segment A1A2 of the backbone route: the interval around the change contains zero and the oracle controller still needs 37.4 s there.
+- With 150 m the oracle controller is still slower than fixed-time control on the backbone route (+36.8 [+26.9, +48.0] s) and faster on the shortest route (-8.9 [-13.2, -4.5] s). The sign of the controller effect therefore does not depend on the preemption distance in this study.
+- On the shortest route earlier preemption shortens the emergency vehicle's time under every controller, most strongly with a degraded camera and the naive counts (-31.6 s).
+- The cause of the delay on A1A2 is still not isolated; the queue-ahead association from the previous table stands as descriptive only.
+
 ## Claims and evidence
 
 | claim | evidence | file |
@@ -118,6 +136,8 @@ With the origin A0 and destination E4 the backbone route equals the shortest rou
 | the reliability score helps the emergency vehicle on the shortest route when the camera is degraded | **supported** (single OD, 12 seeds): -22.9 [-35.3, -10.1] s at 700 veh/h, -32.2 [-38.8, -24.7] s at 900 veh/h | `docs/results/stretch7_shortest_*.json` |
 | adaptive control slows the emergency vehicle in general | **not supported**: on the shortest route B0 to E4 it is faster with a healthy camera (-5.3 [-9.2, -0.6] s at 700 veh/h); slower on the backbone route (+31.4 [+11.8, +51.7] s) | `docs/results/stretch7_*.json` |
 | the emergency-vehicle slow-down on the backbone route comes from queues ahead of it | **partially supported** (descriptive): A1A2 +24.6 [+20.2, +29.4] s with 1.4 to 4.7 vehicles ahead; no intervention on the queue | `docs/results/edge_summary_*_700.csv` |
+| earlier preemption (150 m instead of 80 m) removes the backbone-route delay | **not supported**: segment A1A2 -0.3 [-4.8, +4.2] s; oracle minus fixed-time still +36.8 [+26.9, +48.0] s | `docs/results/preempt150_*_700_runs.csv` |
+| earlier preemption helps the emergency vehicle on the shortest route | **supported** (single OD, 12 seeds): oracle -8.2 [-12.8, -4.1] s, fixed-time -4.6 [-7.9, -1.5] s | `docs/results/preempt150_*_700_runs.csv` |
 
 ## Threats to validity
 
@@ -138,7 +158,7 @@ All code, the network, seeds, per-run tables and summaries are in this repositor
 
 ## Roadmap
 
-Reliability scores from a real monitor and counts from a real detector instead of the emulation; an intervention on the queue ahead of the emergency vehicle (for example a lane-clearing rule); several origin-destination pairs; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
+Reliability scores from a real monitor and counts from a real detector instead of the emulation; a different intervention on the queue ahead of the emergency vehicle (for example a lane-clearing rule); several origin-destination pairs; several corridors sharing junctions; an emergency-vehicle objective in the green-split rules.
 
 ## Citation
 
