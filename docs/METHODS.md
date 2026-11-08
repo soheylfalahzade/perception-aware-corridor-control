@@ -43,6 +43,18 @@ served lanes (q_s) and on the competing lanes (q_c) by a four-rule Sugeno system
 - **aware**: fuzzy rules on r x count + (1 - r) x prior, with the prior a per-junction, per-phase moving average of
   past counts updated only while r >= 0.8 (initial value 8 vehicles); competing lanes use the constant 8 as prior.
 
+### 4.1 Standard controllers and camera-driven max-pressure
+All of them act on the same controlled junctions, keep the yellow phases of the programme, use the green limits of the
+fuzzy rule base (20 to 60 s) and are preempted for the emergency vehicle exactly like the fuzzy controllers.
+- **actuated**: SUMO's gap-based actuated logic (`TRAFFICLIGHT_TYPE_ACTUATED`) on the phases of the fixed programme, with
+  `minDur` 20 s and `maxDur` 60 s on the green phases and SUMO's default detector gap; true counts.
+- **maxpressure**: at the start of a green the duration is set to 60 s; after 20 s, once per second, the green ends when
+  the pressure of the competing phase exceeds that of the running phase. The pressure of a phase is the sum, over the
+  signal links that are green in it, of the vehicles on the incoming lane minus the vehicles on the outgoing lane; true counts.
+- **mp_naive**: the same rule with every lane count thinned by the emulated camera (section 3).
+- **mp_aware**: the same rule on r x pressure + (1 - r) x prior, the prior being a per-junction, per-phase moving average
+  of past camera pressures (weight 0.3) updated only while r >= 0.8, initial value 0.
+
 ## 5. Emergency-vehicle preemption
 Identical for all controllers. When the EV is within 80 m of the stop line of a controlled junction the signal is
 forced green for its approach and all others red; after the EV has left, the signal programme is restored.

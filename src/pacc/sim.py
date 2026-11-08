@@ -19,12 +19,14 @@ from typing import Any
 
 import numpy as np
 
-from pacc.fuzzy import green_duration
+from pacc.fuzzy import G_MAX, G_MIN, green_duration
 from pacc.perception import Camera
 from pacc.replay import ReplayCamera
 
 END_DEMAND, MAX_T, T_EV, PREEMPT_M = 900.0, 1800.0, 450.0, 80.0
-CONTROLLERS = ("fixed", "oracle", "naive", "aware")
+CONTROLLERS = ("fixed", "oracle", "naive", "aware", "actuated", "maxpressure", "mp_naive",
+               "mp_aware")
+MP = ("maxpressure", "mp_naive", "mp_aware")
 GREEN_PHASES = (0, 2)
 PRIOR0, R_TRUST = 8.0, 0.8
 
@@ -87,6 +89,21 @@ def _preempt(conn: Any, tl: str, road: str, lane_edge: list[str]) -> None:
     conn.trafficlight.setRedYellowGreenState(tl, state)
 
 
+def _pressure(conn: Any, io: list[tuple[str, str]], state: str) -> int:
+    """Max-pressure of a phase: vehicles on the incoming lanes it serves minus those on the lanes
+    it feeds."""
+    return sum(conn.lane.getLastStepVehicleNumber(a) - conn.lane.getLastStepVehicleNumber(b)
+               for (a, b), c in zip(io, state, strict=True) if c in "Gg")
+
+
+def _cam_pressure(conn: Any, io: list[tuple[str, str]], state: str, cam: Any, t: float,
+                  degraded: bool) -> float:
+    """Pressure of a phase from camera counts: every lane count is thinned by the camera."""
+    return sum(cam.count(conn.lane.getLastStepVehicleNumber(a), t, degraded)
+               - cam.count(conn.lane.getLastStepVehicleNumber(b), t, degraded)
+               for (a, b), c in zip(io, state, strict=True) if c in "Gg")
+
+
 def run_one(job: Job) -> dict[str, Any]:
     """Simulate one job and return the emergency-vehicle time and the mean time loss."""
     import traci
@@ -107,6 +124,27 @@ def run_one(job: Job) -> dict[str, Any]:
     for tl in tls:
         links = conn.trafficlight.getControlledLinks(tl)
         lane_of[tl] = [grp[0][0] for grp in links]
+    prog = "0"
+    io_of: dict[str, list[tuple[str, str]]] = {}
+    states_of: dict[str, list[str]] = {}
+    if job.controller == "actuated":
+        # SUMO's gap-based actuated logic on the same phases, with the fuzzy rule base's limits
+        prog = "act"
+        for tl in tls:
+            base = next(g for g in conn.trafficlight.getAllProgramLogics(tl) if g.programID == "0")
+            phases = [traci.trafficlight.Phase(p.duration, p.state,
+                                               G_MIN if i in GREEN_PHASES else p.duration,
+                                               G_MAX if i in GREEN_PHASES else p.duration)
+                      for i, p in enumerate(base.phases)]
+            conn.trafficlight.setProgramLogic(tl, traci.trafficlight.Logic(
+                prog, traci.constants.TRAFFICLIGHT_TYPE_ACTUATED, base.currentPhaseIndex,
+                phases=phases))
+            conn.trafficlight.setProgram(tl, prog)
+    if job.controller in MP:
+        for tl in tls:
+            base = next(g for g in conn.trafficlight.getAllProgramLogics(tl) if g.programID == "0")
+            states_of[tl] = [p.state for p in base.phases]
+            io_of[tl] = [(grp[0][0], grp[0][1]) for grp in conn.trafficlight.getControlledLinks(tl)]
     last = dict.fromkeys(tls, -1)
     pre_since: dict[str, float] = {}
     prior: dict[tuple[str, int], float] = {}
@@ -140,7 +178,7 @@ def run_one(job: Job) -> dict[str, Any]:
                 if tl in pre_since:                       # preempting: release after the EV passed
                     if (ev_road is None or not (ev_road.startswith(":") or ev_road in edges)
                             or t - pre_since[tl] > 60.0):
-                        conn.trafficlight.setProgram(tl, "0")
+                        conn.trafficlight.setProgram(tl, prog)
                         del pre_since[tl]
                         last[tl] = -1
                     continue
@@ -151,11 +189,33 @@ def run_one(job: Job) -> dict[str, Any]:
                         pre_since[tl] = t
                         continue
                 ph = conn.trafficlight.getPhase(tl)
+                if (job.controller in MP and ph in GREEN_PHASES and ph == last[tl]
+                        and conn.trafficlight.getSpentDuration(tl) >= G_MIN):
+                    other = 2 if ph == 0 else 0   # switch if the other phase has more pressure
+                    if job.controller == "maxpressure":
+                        pc = float(_pressure(conn, io_of[tl], states_of[tl][ph]))
+                        po = float(_pressure(conn, io_of[tl], states_of[tl][other]))
+                    else:
+                        pc = _cam_pressure(conn, io_of[tl], states_of[tl][ph], cam, t, job.degraded)
+                        po = _cam_pressure(conn, io_of[tl], states_of[tl][other], cam, t,
+                                           job.degraded)
+                        if job.controller == "mp_aware":
+                            kc, ko = (tl, ph), (tl, other)
+                            pc0, po0 = prior.get(kc, 0.0), prior.get(ko, 0.0)
+                            if r >= R_TRUST:
+                                prior[kc], prior[ko] = 0.7 * pc0 + 0.3 * pc, 0.7 * po0 + 0.3 * po
+                            pc, po = r * pc + (1 - r) * pc0, r * po + (1 - r) * po0
+                    if po > pc:
+                        conn.trafficlight.setPhase(tl, ph + 1)
+                    continue
                 if ph == last[tl] or ph not in GREEN_PHASES:
                     last[tl] = ph
                     continue
                 last[tl] = ph
-                if job.controller == "fixed":
+                if job.controller in ("fixed", "actuated"):
+                    continue
+                if job.controller in MP:              # hold the green until the rule switches
+                    conn.trafficlight.setPhaseDuration(tl, G_MAX)
                     continue
                 state = conn.trafficlight.getRedYellowGreenState(tl)
                 served = {lanes[i] for i, c in enumerate(state) if c in "Gg"}

@@ -27,6 +27,10 @@ pacc-eval --corridor-vph 700 --seeds 12 --jobs 2 --out results/eval700     # abo
 pacc-eval --corridor-vph 900 --seeds 12 --jobs 2 --out results/eval900
 pacc-figures --summary results/eval700/summary.json results/eval900/summary.json \
   --labels "700 veh/h" "900 veh/h" --out docs/assets/corridor_results.png
+# standard controllers and camera-driven max-pressure, confirmatory seeds (about 15 min per level)
+pacc-eval --baselines --corridor-vph 700 --seeds 30 --seed0 300 --jobs 4 --out results/base700
+pacc-eval --baselines --corridor-vph 900 --seeds 30 --seed0 300 --jobs 4 --out results/base900
+python -m pacc.render_readme            # fills the generated tables from docs/results/baselines_*.json
 ```
 
 ## Results (SUMO, 12 seeds, paired by seed)
@@ -136,6 +140,97 @@ The emulated camera (a fixed miss rate and a lagged score) can be replaced by fr
 - With the undegraded replayed footage the detector's counts are imperfect (it adds and misses vehicles), so naive control is no longer identical to the oracle, and aware minus naive is -6.3 [-12.8, -0.8] s for the emergency vehicle.
 - The footage degradations are applied to the images, not to the traffic; only the native weather of each clip is real. The replayed frames are not those of the simulated traffic, only the detector's behaviour and the monitor's score are carried over.
 
+## Against standard controllers and a competitive base controller
+
+The comparisons above are against fixed-time control only. This section adds two standard controllers and a camera-driven version of the stronger one, on the same network, demand and degradation episode. All of them act on the same controlled junctions with the same green limits (20 to 60 s) and the same emergency-vehicle preemption.
+
+- **actuated**: SUMO's gap-based actuated logic on the same phases, using SUMO's detectors (true counts).
+- **max-pressure**: the green is held until the competing phase has more pressure (vehicles on the incoming lanes it serves minus vehicles on the lanes it feeds), after a minimum green of 20 s and up to 60 s, on true counts.
+- **max-pressure on camera counts, naive and aware**: the same rule on camera counts under the degradation episode of the main study; the aware version weights each phase pressure by the reliability score r and a per-junction, per-phase prior, as in the method above.
+
+Protocol, fixed before the confirmatory runs: seeds 300 to 329 (30 seeds, not used in any other analysis here); exploratory runs on seeds 200 to 209 at 700 veh/h shaped the design and are not part of any table. The primary endpoint is the corridor time loss at 700 veh/h of max-pressure on camera counts with the reliability score minus max-pressure on camera counts without it, both under the degraded camera. All other metrics, comparisons and the 900 veh/h level are secondary. Each comparison is a paired difference over seeds with a percentile bootstrap interval and a paired sign-flip test (exact up to 16 seeds, 200 000 random sign patterns otherwise); the Holm correction covers all comparisons of a demand level, and the results are reported whichever way they fall (`pacc-eval --baselines`).
+
+<!-- BEGIN:baselines_means -->
+**Corridor flow of 700 vehicles per hour** (mean over 30 seeds)
+
+| controller | corridor time loss [s] | EV travel time [s] | other time loss [s] |
+| --- | --- | --- | --- |
+| fixed-time | 143.3 | 144.3 | 64.4 |
+| actuated | 52.9 | 121.9 | 56.6 |
+| max-pressure | 44.4 | 112.5 | 56.0 |
+| fuzzy, true counts | 128.5 | 157.5 | 63.8 |
+| fuzzy, camera, degraded | 139.0 | 175.4 | 64.1 |
+| fuzzy, camera + reliability, degraded | 124.3 | 165.4 | 63.5 |
+| max-pressure, camera, degraded | 56.9 | 129.6 | 56.2 |
+| max-pressure, camera + reliability, degraded | 49.1 | 117.9 | 58.7 |
+
+**Corridor flow of 900 vehicles per hour** (mean over 30 seeds)
+
+| controller | corridor time loss [s] | EV travel time [s] | other time loss [s] |
+| --- | --- | --- | --- |
+| fixed-time | 252.8 | 312.1 | 71.6 |
+| actuated | 69.0 | 142.1 | 58.6 |
+| max-pressure | 52.9 | 125.1 | 59.9 |
+| fuzzy, true counts | 157.3 | 215.2 | 68.9 |
+| fuzzy, camera, degraded | 188.7 | 245.3 | 69.1 |
+| fuzzy, camera + reliability, degraded | 178.3 | 233.6 | 68.4 |
+| max-pressure, camera, degraded | 74.6 | 151.3 | 59.6 |
+| max-pressure, camera + reliability, degraded | 60.2 | 132.7 | 62.0 |
+<!-- END:baselines_means -->
+
+<!-- BEGIN:baselines_tests -->
+**700 vehicles per hour**: paired difference [95% bootstrap interval] (Holm-adjusted p over the 48 comparisons of this level)
+
+| comparison | corridor time loss [s] | EV travel time [s] | other time loss [s] |
+| --- | --- | --- | --- |
+| fuzzy, true counts minus fixed-time | -14.8 [-21.2, -8.8] (Holm <0.001) | +13.3 [+1.7, +25.7] (Holm 0.274) | -0.6 [-1.3, +0.1] (Holm 0.521) |
+| fuzzy, true counts minus actuated | +75.6 [+70.3, +80.6] (Holm <0.001) | +35.7 [+26.9, +46.2] (Holm <0.001) | +7.2 [+6.5, +7.8] (Holm <0.001) |
+| fuzzy, true counts minus max-pressure | +84.1 [+79.0, +89.0] (Holm <0.001) | +45.0 [+36.4, +54.9] (Holm <0.001) | +7.8 [+7.1, +8.6] (Holm <0.001) |
+| fuzzy, camera, degraded minus fixed-time | -4.3 [-10.3, +1.2] (Holm 0.620) | +31.2 [+19.7, +43.0] (Holm <0.001) | -0.2 [-0.9, +0.5] (Holm 0.620) |
+| fuzzy, camera, degraded minus actuated | +86.0 [+80.4, +91.5] (Holm <0.001) | +53.6 [+45.9, +61.5] (Holm <0.001) | +7.5 [+7.0, +8.1] (Holm <0.001) |
+| fuzzy, camera, degraded minus max-pressure | +94.6 [+89.1, +100.1] (Holm <0.001) | +62.9 [+54.8, +72.1] (Holm <0.001) | +8.2 [+7.5, +8.8] (Holm <0.001) |
+| fuzzy, camera + reliability, degraded minus fixed-time | -19.0 [-23.6, -14.2] (Holm <0.001) | +21.1 [+7.6, +33.5] (Holm 0.035) | -0.9 [-1.7, -0.2] (Holm 0.221) |
+| fuzzy, camera + reliability, degraded minus actuated | +71.3 [+68.3, +74.3] (Holm <0.001) | +43.5 [+33.4, +54.0] (Holm <0.001) | +6.9 [+6.3, +7.4] (Holm <0.001) |
+| fuzzy, camera + reliability, degraded minus max-pressure | +79.9 [+76.8, +83.2] (Holm <0.001) | +52.9 [+42.2, +63.8] (Holm <0.001) | +7.5 [+6.9, +8.1] (Holm <0.001) |
+| max-pressure, camera, degraded minus fixed-time | -86.4 [-91.0, -81.7] (Holm <0.001) | -14.6 [-21.6, -8.6] (Holm <0.001) | -8.1 [-8.7, -7.6] (Holm <0.001) |
+| max-pressure, camera, degraded minus actuated | +4.0 [+1.7, +6.1] (Holm 0.026) | +7.8 [+3.7, +12.0] (Holm 0.015) | -0.4 [-0.8, +0.1] (Holm 0.565) |
+| max-pressure, camera, degraded minus max-pressure | +12.5 [+10.7, +14.3] (Holm <0.001) | +17.1 [+12.5, +21.7] (Holm <0.001) | +0.3 [-0.2, +0.7] (Holm 0.620) |
+| max-pressure, camera + reliability, degraded minus fixed-time | -94.3 [-98.8, -89.5] (Holm <0.001) | -26.3 [-35.3, -18.1] (Holm <0.001) | -5.7 [-6.5, -4.8] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus actuated | -3.9 [-6.4, -1.4] (Holm 0.054) | -3.9 [-9.2, +2.2] (Holm 0.620) | +2.1 [+1.3, +2.9] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus max-pressure | +4.7 [+2.6, +6.7] (Holm 0.002) | +5.4 [+0.4, +11.2] (Holm 0.480) | +2.8 [+2.2, +3.4] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus max-pressure, camera, degraded | -7.9 [-10.3, -5.4] (Holm <0.001) | -11.7 [-17.9, -4.9] (Holm 0.027) | +2.5 [+1.8, +3.2] (Holm <0.001) |
+
+**900 vehicles per hour**: paired difference [95% bootstrap interval] (Holm-adjusted p over the 48 comparisons of this level)
+
+| comparison | corridor time loss [s] | EV travel time [s] | other time loss [s] |
+| --- | --- | --- | --- |
+| fuzzy, true counts minus fixed-time | -95.6 [-100.5, -90.5] (Holm <0.001) | -96.9 [-126.2, -65.6] (Holm <0.001) | -2.7 [-3.6, -1.7] (Holm <0.001) |
+| fuzzy, true counts minus actuated | +88.2 [+82.9, +93.2] (Holm <0.001) | +73.1 [+60.0, +86.1] (Holm <0.001) | +10.4 [+9.4, +11.4] (Holm <0.001) |
+| fuzzy, true counts minus max-pressure | +104.4 [+99.8, +109.0] (Holm <0.001) | +90.1 [+78.8, +101.8] (Holm <0.001) | +9.0 [+7.7, +10.3] (Holm <0.001) |
+| fuzzy, camera, degraded minus fixed-time | -64.1 [-69.9, -58.3] (Holm <0.001) | -66.8 [-94.8, -37.9] (Holm <0.001) | -2.5 [-3.5, -1.6] (Holm <0.001) |
+| fuzzy, camera, degraded minus actuated | +119.7 [+114.6, +124.9] (Holm <0.001) | +103.2 [+90.7, +115.2] (Holm <0.001) | +10.5 [+9.7, +11.4] (Holm <0.001) |
+| fuzzy, camera, degraded minus max-pressure | +135.8 [+131.5, +140.4] (Holm <0.001) | +120.2 [+107.2, +133.8] (Holm <0.001) | +9.2 [+8.0, +10.2] (Holm <0.001) |
+| fuzzy, camera + reliability, degraded minus fixed-time | -74.6 [-80.2, -69.1] (Holm <0.001) | -78.5 [-113.2, -43.3] (Holm 0.002) | -3.2 [-4.1, -2.3] (Holm <0.001) |
+| fuzzy, camera + reliability, degraded minus actuated | +109.2 [+104.0, +114.1] (Holm <0.001) | +91.5 [+74.5, +108.7] (Holm <0.001) | +9.9 [+9.0, +10.7] (Holm <0.001) |
+| fuzzy, camera + reliability, degraded minus max-pressure | +125.4 [+120.0, +130.7] (Holm <0.001) | +108.5 [+92.6, +124.8] (Holm <0.001) | +8.5 [+7.5, +9.5] (Holm <0.001) |
+| max-pressure, camera, degraded minus fixed-time | -178.2 [-183.8, -172.8] (Holm <0.001) | -160.8 [-190.4, -131.8] (Holm <0.001) | -12.1 [-13.0, -11.2] (Holm <0.001) |
+| max-pressure, camera, degraded minus actuated | +5.6 [+3.0, +8.2] (Holm 0.003) | +9.2 [+1.3, +16.5] (Holm 0.144) | +1.0 [+0.5, +1.5] (Holm 0.002) |
+| max-pressure, camera, degraded minus max-pressure | +21.7 [+19.5, +24.0] (Holm <0.001) | +26.2 [+19.5, +33.2] (Holm <0.001) | -0.4 [-1.1, +0.3] (Holm 0.334) |
+| max-pressure, camera + reliability, degraded minus fixed-time | -192.6 [-198.1, -187.0] (Holm <0.001) | -179.4 [-206.9, -152.3] (Holm <0.001) | -9.6 [-10.8, -8.4] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus actuated | -8.8 [-12.2, -5.6] (Holm <0.001) | -9.4 [-17.7, -1.3] (Holm 0.144) | +3.4 [+2.8, +4.1] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus max-pressure | +7.3 [+5.4, +9.2] (Holm <0.001) | +7.6 [+0.6, +15.4] (Holm 0.144) | +2.1 [+1.5, +2.7] (Holm <0.001) |
+| max-pressure, camera + reliability, degraded minus max-pressure, camera, degraded | -14.4 [-17.5, -11.3] (Holm <0.001) | -18.6 [-26.4, -10.7] (Holm <0.001) | +2.4 [+1.7, +3.2] (Holm <0.001) |
+<!-- END:baselines_tests -->
+
+<!-- BEGIN:baselines_reading -->
+Reading, generated from the tables above (corridor time loss, Holm-adjusted):
+
+- 700 veh/h: of the 15 comparisons of a camera-based controller with a baseline, 4 favour the camera-based controller, 9 favour the baseline and 2 are indistinguishable.
+- 900 veh/h: of the 15 comparisons of a camera-based controller with a baseline, 6 favour the camera-based controller, 9 favour the baseline and 0 are indistinguishable.
+
+Primary endpoint (fixed before the confirmatory runs): corridor time loss at 700 veh/h, max-pressure, camera + reliability, degraded minus max-pressure, camera, degraded: -7.9 [-10.3, -5.4] (Holm <0.001) s, better.
+<!-- END:baselines_reading -->
+
 ## Claims and evidence
 
 | claim | evidence | file |
@@ -154,12 +249,25 @@ The emulated camera (a fixed miss rate and a lagged score) can be replaced by fr
 | earlier preemption helps the emergency vehicle on the shortest route | **supported** (single OD, 12 seeds): oracle -8.2 [-12.8, -4.1] s, fixed-time -4.6 [-7.9, -1.5] s | `docs/results/preempt150_*_700_runs.csv` |
 | the reliability score helps when the camera follows the behaviour measured on real footage | **partially supported**: night replay (detector count about zero), aware minus naive EV time -30.3 [-37.3, -23.3] s and corridor delay -18.6 [-24.6, -13.6] s; rain replay +7.4 [-2.4, +18.5] s and -5.0 [-11.5, +2.2] s (not resolved) | `docs/results/replay_*_700.json` |
 
+### Claims against standard controllers
+
+<!-- BEGIN:baselines_claims -->
+| claim | evidence | file |
+| --- | --- | --- |
+| reliability-aware weighting helps camera-based max-pressure under a degraded camera | **supported**: corridor time loss, 700 veh/h: -7.9 [-10.3, -5.4] (Holm <0.001) s, better; 900 veh/h: -14.4 [-17.5, -11.3] (Holm <0.001) s, better | `docs/results/baselines_*.json` |
+| camera-based max-pressure with reliability weighting beats actuated control | **partially supported**: corridor time loss, 700 veh/h: -3.9 [-6.4, -1.4] (Holm 0.054) s, indistinguishable; 900 veh/h: -8.8 [-12.2, -5.6] (Holm <0.001) s, better | `docs/results/baselines_*.json` |
+| fuzzy green splits with a degraded camera and reliability score beat fixed-time control | **supported**: corridor time loss, 700 veh/h: -19.0 [-23.6, -14.2] (Holm <0.001) s, better; 900 veh/h: -74.6 [-80.2, -69.1] (Holm <0.001) s, better | `docs/results/baselines_*.json` |
+| ... beat actuated control | **not supported**: corridor time loss, 700 veh/h: +71.3 [+68.3, +74.3] (Holm <0.001) s, worse; 900 veh/h: +109.2 [+104.0, +114.1] (Holm <0.001) s, worse | `docs/results/baselines_*.json` |
+| ... beat max-pressure control with true counts | **not supported**: corridor time loss, 700 veh/h: +79.9 [+76.8, +83.2] (Holm <0.001) s, worse; 900 veh/h: +125.4 [+120.0, +130.7] (Holm <0.001) s, worse | `docs/results/baselines_*.json` |
+<!-- END:baselines_claims -->
+
 ## Threats to validity
 
 - *Construct:* perception is emulated at the interface of counts and a reliability score; the miss model (binomial thinning), the severity and the lag are assumptions, not measurements of a detector. The lag is chosen in line with alarm latencies reported by `perception-reliability-monitor`.
+- *Baselines:* actuated control and max-pressure on true counts see the lanes exactly, so they are an upper-information reference and not a camera-based competitor; only the two max-pressure variants on camera counts are camera-based. The green limits and the minimum green of 20 s were taken from the fuzzy rule base and were not tuned for any controller.
 - *Internal:* the rule base, the prior update and the trust threshold (r >= 0.8) were set a priori and not tuned; the corridor flow and the degradation window are fixed scenario choices. The emergency-vehicle result at 700 veh/h is unexplained.
 - *External:* one 5 x 5 grid, one route, one degradation episode and one emergency-vehicle trip per run; for A0 to E4 the backbone route coincides with the shortest route (stretch 1.0); the larger-stretch comparison uses one other origin-destination pair (B0 to E4).
-- *Statistical:* 12 seeds; intervals are bootstrap intervals of the mean paired difference and are not corrected for the number of comparisons.
+- *Statistical:* 12 seeds; intervals are bootstrap intervals of the mean paired difference and are not corrected for the number of comparisons. The comparisons against standard controllers use 30 further seeds and a Holm correction within each demand level; the earlier tables remain uncorrected.
 
 ## Data and code availability
 
