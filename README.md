@@ -6,6 +6,10 @@
 
 A camera-based signal controller usually receives a vehicle count and nothing about the quality of that count. When the camera degrades (rain, glare, dirt) the count is too low, and a controller that trusts it shortens the wrong greens. This package asks whether passing a reliability score to the controller, so that it falls back on what it learned in good conditions when the score is low, recovers the loss. The corridor is a route on a spanner backbone of the street grid, and only the junctions of that route are controlled. Nothing is trained and no detector is run: perception is emulated at its interface (counts that miss vehicles, and a lagged reliability score).
 
+<!-- BEGIN:baselines_scope -->
+**Scope of the comparison.** The first results below compare the fuzzy corridor controller with fixed-time control. On corridor time loss at every tested demand level, the fuzzy controller with a degraded camera and the reliability score is worse than actuated control and worse than max-pressure on true counts (section *Against standard controllers and a competitive base controller*), which also tests the reliability score on a competitive base controller, max-pressure on camera counts.
+<!-- END:baselines_scope -->
+
 <p align="center"><img src="docs/assets/backbone_route.png" alt="Backbone, emergency-vehicle route and controlled junctions" width="420"></p>
 
 ## Method in one paragraph
@@ -235,7 +239,7 @@ Primary endpoint (fixed before the confirmatory runs): corridor time loss at 700
 
 | claim | evidence | file |
 |---|---|---|
-| fuzzy green splits reduce corridor delay when counts are right | 700 veh/h: -18.8 [-29.3, -9.6] s; 900 veh/h: -103.6 [-111.8, -96.1] s | `docs/results/summary_*.json` |
+| fuzzy green splits reduce corridor delay when counts are right (against fixed-time control) | 700 veh/h: -18.8 [-29.3, -9.6] s; 900 veh/h: -103.6 [-111.8, -96.1] s | `docs/results/summary_*.json` |
 | a degraded camera removes the gain | naive degraded at 700 veh/h: -2.6 [-11.7, 5.6] s | `docs/results/summary_700.json` |
 | the reliability score recovers it | aware minus naive, degraded, 700 veh/h: -17.1 [-23.5, -11.1] s | `docs/results/summary_700.json` |
 | the reliability score helps at saturation | **partially supported**: corridor delay -7.7 [-16.9, 1.6] s (interval includes zero), EV time -37.2 [-69.0, -4.8] s | `docs/results/summary_900.json` |

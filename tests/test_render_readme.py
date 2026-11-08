@@ -115,3 +115,17 @@ def test_readme_documents_blocks_and_confirmatory_seeds():
 @pytest.mark.parametrize("name", list(rr.BLOCKS))
 def test_each_block_renders_from_the_fake_data(name):
     assert rr.BLOCKS[name](_data()).strip()
+
+
+def test_scope_note_follows_the_data():
+    worse = _data(worse=("aware_degraded - actuated_clear", "aware_degraded - maxpressure_clear"))
+    assert "is worse than actuated control and worse than max-pressure" in rr.block_scope(worse)
+    better = _data(better=("aware_degraded - actuated_clear",))
+    assert "is better than actuated control and mixed against max-pressure" in rr.block_scope(
+        better
+    )
+    mixed = _data(worse=("aware_degraded - actuated_clear",))
+    mixed[900]["comparisons"]["aware_degraded - actuated_clear | corridor_loss_s"] = _cmp(
+        -5.0, -8.0, -2.0, 0.01
+    )
+    assert "is mixed against actuated control" in rr.block_scope(mixed)

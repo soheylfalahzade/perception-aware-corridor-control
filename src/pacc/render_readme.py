@@ -194,7 +194,30 @@ def block_reading(data: dict[int, dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def block_scope(data: dict[int, dict[str, Any]]) -> str:
+    def word(base: str) -> str:
+        labels = [
+            classify(get(d, "aware_degraded", base, "corridor_loss_s")) for d in data.values()
+        ]
+        if all(x == "worse" for x in labels):
+            return "worse than"
+        if all(x == "better" for x in labels):
+            return "better than"
+        return "mixed against"
+
+    return (
+        "**Scope of the comparison.** The first results below compare the fuzzy corridor "
+        "controller with fixed-time control. On corridor time loss at every tested demand level, "
+        "the fuzzy controller with a degraded camera and the reliability score is "
+        f"{word('actuated_clear')} actuated control and {word('maxpressure_clear')} max-pressure "
+        "on true counts (section *Against standard controllers and a competitive base "
+        "controller*), which also tests the reliability score on a competitive base controller, "
+        "max-pressure on camera counts."
+    )
+
+
 BLOCKS = {
+    "baselines_scope": block_scope,
     "baselines_means": block_means,
     "baselines_tests": block_tests,
     "baselines_claims": block_claims,
