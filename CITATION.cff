@@ -10,6 +10,7 @@ repository-code: "https://github.com/soheylfalahzade/perception-aware-corridor-c
 keywords:
   - traffic signal control
   - fuzzy control
+  - max-pressure control
   - geometric spanners
   - perception reliability
   - emergency vehicle preemption

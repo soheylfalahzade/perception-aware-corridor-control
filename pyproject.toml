@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "perception-aware-corridor-control"
 version = "0.1.0"
-description = "Does passing a perception-reliability signal to a fuzzy corridor controller help when the camera degrades? Backbone routes, fuzzy green splits and emergency-vehicle preemption in SUMO"
+description = "Reliability-weighted max-pressure control from degraded camera counts: standard controllers, a fuzzy green-split controller and emergency-vehicle preemption on a SUMO corridor"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

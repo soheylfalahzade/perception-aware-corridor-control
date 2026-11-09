@@ -216,7 +216,65 @@ def block_scope(data: dict[int, dict[str, Any]]) -> str:
     )
 
 
+def block_study(data: dict[int, dict[str, Any]]) -> str:
+    rows = []
+    for flow, d in data.items():
+        m = d["means"]["corridor_loss_s"]
+        lost = m["mp_naive_degraded"] - m["maxpressure_clear"]
+        gain = get(d, "mp_aware_degraded", "mp_naive_degraded", "corridor_loss_s")
+        share = 100 * (m["mp_naive_degraded"] - m["mp_aware_degraded"]) / lost
+        act = get(d, "mp_aware_degraded", "actuated_clear", "corridor_loss_s")
+        rows.append(
+            [
+                f"{flow} veh/h",
+                f"{lost:+.1f}",
+                cell(gain),
+                f"{share:.0f} %",
+                f"{cell(act)}, {classify(act)}",
+            ]
+        )
+    head = [
+        "demand",
+        "time loss added by the degraded camera (unweighted max-pressure minus true counts) [s]",
+        "change from reliability weighting [s]",
+        "share recovered",
+        "weighted camera-based max-pressure minus actuated [s]",
+    ]
+    cam, base, metric = PRIMARY
+    levels = list(data)
+    n_seeds = data[levels[0]]["n_seeds"]
+    fz = {
+        f: classify(get(d, "aware_degraded", "actuated_clear", "corridor_loss_s"))
+        for f, d in data.items()
+    }
+    same = len(set(fz.values())) == 1
+    fuzzy = (
+        f"{fz[levels[0]]} than actuated control at every level"
+        if same
+        else "mixed against actuated control"
+    )
+    return "\n".join(
+        [
+            "**Main result.** Primary endpoint: corridor time loss of max-pressure on camera "
+            "counts with the reliability score minus the same controller without it, both "
+            f"under the degraded camera, {levels[0]} veh/h "
+            f"({cell(get(data[levels[0]], cam, base, metric))} s, "
+            f"{classify(get(data[levels[0]], cam, base, metric))}).",
+            "",
+            md(head, rows),
+            "",
+            "The fuzzy green-split controller of the first study, with the same degraded camera "
+            f"and the reliability score, is {fuzzy} on corridor time loss. Paired differences "
+            f"over {n_seeds} seeds with a percentile bootstrap interval and Holm-adjusted "
+            "p-values; all "
+            "comparisons are in the section *Against standard controllers and a competitive "
+            "base controller*.",
+        ]
+    )
+
+
 BLOCKS = {
+    "study_summary": block_study,
     "baselines_scope": block_scope,
     "baselines_means": block_means,
     "baselines_tests": block_tests,

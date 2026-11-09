@@ -129,3 +129,44 @@ def test_scope_note_follows_the_data():
         -5.0, -8.0, -2.0, 0.01
     )
     assert "is mixed against actuated control" in rr.block_scope(mixed)
+
+
+def _means(naive=56.9, aware=49.1, true=44.4):
+    base = {k: 100.0 for k in rr.ORDER}
+    base.update(mp_naive_degraded=naive, mp_aware_degraded=aware, maxpressure_clear=true)
+    return base
+
+
+def test_study_summary_numbers_and_share_recovered():
+    data = _data(better=("mp_aware_degraded - mp_naive_degraded",))
+    for d in data.values():
+        d["means"]["corridor_loss_s"] = _means()
+    text = rr.block_study(data)
+    assert "| 700 veh/h | +12.5 | -10.0 [-15.0, -5.0] (Holm 0.010) | 62 % |" in text
+    assert "over 30 seeds" in text and "Primary endpoint" in text
+    flat = _data(worse=("aware_degraded - actuated_clear",))
+    for d in flat.values():
+        d["means"]["corridor_loss_s"] = _means()
+    assert "is worse than actuated control at every level" in rr.block_study(flat)
+    mixed = _data(worse=("aware_degraded - actuated_clear",))
+    for d in mixed.values():
+        d["means"]["corridor_loss_s"] = _means()
+    mixed[900]["comparisons"]["aware_degraded - actuated_clear | corridor_loss_s"] = _cmp(
+        -5.0, -8.0, -2.0, 0.01
+    )
+    assert "mixed against actuated control" in rr.block_study(mixed)
+
+
+def test_banner_values_follow_the_data_and_match_the_recorded_summaries():
+    from pacc import banner
+
+    data = _data(better=("mp_aware_degraded - mp_naive_degraded",))
+    for d in data.values():
+        d["means"]["corridor_loss_s"] = _means()
+    t = banner.texts(data)
+    assert t[2] == "\u221210.0 s" and t[5] == "\u221210.0 s" and t[8] == "62 % / 62 %"
+    assert banner.signed(3.04) == "+3.0" and banner.signed(-0.04) == "\u22120.0"
+    out = subprocess.run(
+        [sys.executable, "-m", "pacc.banner", "--check"], cwd=ROOT, capture_output=True, text=True
+    )
+    assert out.returncode == 0, out.stdout + out.stderr

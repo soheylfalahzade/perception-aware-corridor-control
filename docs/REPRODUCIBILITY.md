@@ -23,6 +23,7 @@ cp results/base700/runs.csv docs/results/baselines_700_runs.csv
 cp results/base900/runs.csv docs/results/baselines_900_runs.csv
 python -m pacc.render_readme           # fills the generated tables of README.md
 python -m pacc.render_readme --check   # fails if README.md differs from the recorded data
+python -m pacc.banner --check          # fails if the banner differs from the recorded data
 ```
 
 With a system SUMO installation, set `SUMO_HOME` (for example `/usr/share/sumo`) so that `randomTrips.py` is found.
